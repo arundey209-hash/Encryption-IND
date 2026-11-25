@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Translator</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #101827;
+    color: white;
+    padding: 20px;
+}
+
+.container {
+    max-width: 550px;
+    margin: auto;
+}
+
+h1 {
+    text-align: center;
+    color: #38bdf8;
+}
+
+.subtitle {
+    text-align: center;
+    color: #aab7c5;
+}
+
+.identity, .box {
+    background: #1e293b;
+    padding: 18px;
+    border-radius: 12px;
+    margin-top: 18px;
+}
+
+label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 13px;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    background: #0f172a;
+    color: white;
+    font-size: 15px;
+}
+
+textarea {
+    height: 150px;
+    resize: vertical;
+}
+
+.buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+button {
+    padding: 13px;
+    border: none;
+    border-radius: 8px;
+    background: #0284c7;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+button:active {
+    opacity: 0.7;
+}
+
+.secondary {
+    background: #334155;
+}
+
+.output {
+    min-height: 100px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: #0f172a;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.status {
+    margin-top: 12px;
+    color: #38bdf8;
+    font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>CODE TRANSLATOR</h1>
+<p class="subtitle">Your language. Your identity.</p>
+
+<div class="identity">
+    <label>Code Identity</label>
+    <input id="identity" type="number"
+    min="0" step="1" placeholder="Enter identity (Default: 0)">
+</div>
+
+<div class="box">
+
+<label>Choose Translation</label>
+
+<div class="buttons">
+    <button onclick="setMode('encode')">
+        Normal → Code
+    </button>
+
+    <button onclick="setMode('decode')">
+        Code → Normal
+    </button>
+</div>
+
+</div>
+
+<div class="box">
+
+<label id="inputLabel">Enter Normal Text</label>
+
+<textarea id="input"
+placeholder="Type your message here..."></textarea>
+
+<div class="buttons">
+    <button onclick="translateText()">Translate</button>
+    <button class="secondary" onclick="clearInput()">Clear Input</button>
+</div>
+
+</div>
+
+<div class="box">
+
+<label>Result</label>
+
+<div class="output" id="output">
+Your result will appear here.
+</div>
+
+<button style="width:100%; margin-top:12px"
+onclick="copyResult()">Copy Result</button>
+
+<div class="status" id="status"></div>
+
+</div>
+
+</div>
+
+<script>
+
+let mode = "encode";
+
+function setMode(selected) {
+
+    mode = selected;
+
+    document.getElementById("input").value = "";
+    document.getElementById("output").textContent =
+        "Your result will appear here.";
+
+    document.getElementById("inputLabel").textContent =
+        mode === "encode"
+        ? "Enter Normal Text"
+        : "Enter Coded Message";
+
+    document.getElementById("status").textContent = "";
+}
+
+
+// A-Z conversion
+
+function encodeWord(word) {
+
+    return word.split("").map(char => {
+
+        let number = char.toUpperCase().charCodeAt(0) - 64;
+
+        return number + (char === char.toUpperCase() ? "*" : "");
+
+    }).join(".");
+
+}
+
+
+function decodeWord(word) {
+
+    return word.split(".").map(part => {
+
+        let capital = part.endsWith("*");
+
+        let number = Number(part.replace("*", ""));
+
+        if (!Number.isInteger(number) || number < 1 || number > 26) {
+            throw new Error("Invalid letter code: " + part);
+        }
+
+        let letter = String.fromCharCode(number + 64);
+
+        return capital ? letter : letter.toLowerCase();
+
+    }).join("");
+
+}
+
+
+// Normal language to code
+
+function encodeText(text) {
+
+    let tokens = text.match(/[A-Za-z]+|\d+|[^A-Za-z\d]+/g) || [];
+
+    let result = tokens.map(token => {
+
+        if (/^[A-Za-z]+$/.test(token)) {
+            return '"' + encodeWord(token) + '"';
+        }
+
+        if (/^\d+$/.test(token)) {
+            return '(' + token + ')';
+        }
+
+        return token.replace(/\./g, "!");
+
+    }).join("");
+
+    let identity = document.getElementById("identity").value.trim();
+
+    if (identity === "") identity = "0";
+
+    if (!/^\d+$/.test(identity)) {
+        throw new Error("Identity must be a non-negative whole number.");
+    }
+
+    return "/@" + identity + "/\n\n" +
+           result +
+           "\n\n/@" + identity + "/";
+
+}
+
+
+// Code to normal language
+
+function decodeText(text) {
+
+    let lines = text.trim().split(/\r?\n/);
+
+    if (lines.length < 3) {
+        throw new Error("Invalid message structure.");
+    }
+
+    let start = lines[0].trim();
+    let end = lines[lines.length - 1].trim();
+
+    let identityPattern = /^\/@(\d+)\/$/;
+
+    let startMatch = start.match(identityPattern);
+    let endMatch = end.match(identityPattern);
+
+    if (!startMatch || !endMatch) {
+        throw new Error("Invalid code identity.");
+    }
+
+    if (startMatch[1] !== endMatch[1]) {
+        throw new Error("Starting and ending identities do not match!");
+    }
+
+    let content = lines.slice(1, -1).join("\n").trim();
+
+    let output = "";
+    let position = 0;
+
+    while (position < content.length) {
+
+        let remaining = content.slice(position);
+
+        // Encoded words
+        if (remaining.startsWith('"')) {
+
+            let endQuote = remaining.indexOf('"', 1);
+
+            if (endQuote === -1) {
+                throw new Error("Missing closing quotation mark.");
+            }
+
+            let word = remaining.slice(1, endQuote);
+
+            output += decodeWord(word);
+
+            position += endQuote + 1;
+
+            continue;
+        }
+
+        // Numbers
+        if (remaining.startsWith("(")) {
+
+            let endBracket = remaining.indexOf(")");
+
+            if (endBracket === -1) {
+                throw new Error("Missing closing number bracket.");
+            }
+
+            let number = remaining.slice(1, endBracket);
+
+            if (!/^\d+$/.test(number)) {
+                throw new Error("Invalid number.");
+            }
+
+            output += number;
+
+            position += endBracket + 1;
+
+            continue;
+        }
+
+        // Full stop
+        if (remaining.startsWith("!")) {
+            output += ".";
+            position++;
+            continue;
+        }
+
+        // Other characters and spaces
+        output += content[position];
+
+        position++;
+    }
+
+    return output;
+}
+
+
+// Main translation
+
+function translateText() {
+
+    let input = document.getElementById("input").value;
+
+    let output = document.getElementById("output");
+    let status = document.getElementById("status");
+
+    if (!input.trim()) {
+        status.textContent = "Please enter something first.";
+        return;
+    }
+
+    try {
+
+        let result = mode === "encode"
+            ? encodeText(input)
+            : decodeText(input);
+
+        output.textContent = result;
+        status.textContent = "Translation successful.";
+
+    } catch(error) {
+
+        output.textContent = "";
+        status.textContent = "Error: " + error.message;
+
+    }
+
+}
+
+
+// Copy result
+
+function copyResult() {
+
+    let text = document.getElementById("output").textContent;
+
+    if (!text || text === "Your result will appear here.") {
+        document.getElementById("status").textContent =
+            "Nothing to copy.";
+        return;
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+
+        navigator.clipboard.writeText(text).then(() => {
+            document.getElementById("status").textContent =
+                "Result copied!";
+        }).catch(() => {
+            document.getElementById("status").textContent =
+                "Copy failed.";
+        });
+
+    } else {
+
+        let area = document.createElement("textarea");
+        area.value = text;
+        document.body.appendChild(area);
+        area.select();
+
+        try {
+            document.execCommand("copy");
+            document.getElementById("status").textContent =
+                "Result copied!";
+        } catch(error) {
+            document.getElementById("status").textContent =
+                "Copy failed.";
+        }
+
+        area.remove();
+    }
+}
+
+
+// Clear input
+
+function clearInput() {
+
+    document.getElementById("input").value = "";
+
+    document.getElementById("output").textContent =
+        "Your result will appear here.";
+
+    document.getElementById("status").textContent = "";
+
+}
+
+</script>
+
+</body>
+</html>
